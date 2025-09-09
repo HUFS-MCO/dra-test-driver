@@ -27,13 +27,21 @@ import (
 	cdispec "tags.cncf.io/container-device-interface/specs-go"
 )
 
-const (
+/*const (
 	cdiVendor = "k8s." + consts.DriverName
 	cdiClass  = "gpu"
 	cdiKind   = cdiVendor + "/" + cdiClass
 
 	cdiCommonDeviceName = "common"
+)*/
+const (
+	cdiVendor = "k8s." + consts.DriverName
+	cdiClass  = "cpu"
+	cdiKind   = cdiVendor + "/" + cdiClass
+
+	cdiCommonDeviceName = "common"
 )
+
 
 type CDIHandler struct {
 	cache *cdiapi.Cache
@@ -83,13 +91,18 @@ func (cdi *CDIHandler) CreateCommonSpecFile() error {
 	return cdi.cache.WriteSpec(spec, specName)
 }
 
-func (cdi *CDIHandler) CreateClaimSpecFile(claimUID string, devices PreparedDevices) error {
-	specName := cdiapi.GenerateTransientSpecName(cdiVendor, cdiClass, claimUID)
+func (cdi *CDIHandler) CreateClaimSpecFile(claimUID string, devices PreparedDevices, rtCDIDevices []string) error {
+	//specName := cdiapi.GenerateTransientSpecName(cdiVendor, cdiClass, claimUID)
 
 	spec := &cdispec.Spec{
 		Kind:    cdiKind,
 		Devices: []cdispec.Device{},
 	}
+	fmt.Println("rtcdidevices:", rtCDIDevices)
+	cpuIdx := 
+	/*
+    switch devices.Type() {
+	case nascrd.RtCpuType:*/
 
 	for _, device := range devices {
 		claimEdits := cdiapi.ContainerEdits{
