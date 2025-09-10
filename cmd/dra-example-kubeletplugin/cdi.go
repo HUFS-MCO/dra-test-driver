@@ -91,15 +91,13 @@ func (cdi *CDIHandler) CreateCommonSpecFile() error {
 	return cdi.cache.WriteSpec(spec, specName)
 }
 
-func (cdi *CDIHandler) CreateClaimSpecFile(claimUID string, devices PreparedDevices, rtCDIDevices []string) error {
-	//specName := cdiapi.GenerateTransientSpecName(cdiVendor, cdiClass, claimUID)
+func (cdi *CDIHandler) CreateClaimSpecFile(claimUID string, devices PreparedDevices) error {
+	specName := cdiapi.GenerateTransientSpecName(cdiVendor, cdiClass, claimUID)
 
 	spec := &cdispec.Spec{
 		Kind:    cdiKind,
 		Devices: []cdispec.Device{},
 	}
-	fmt.Println("rtcdidevices:", rtCDIDevices)
-	cpuIdx := 
 	/*
     switch devices.Type() {
 	case nascrd.RtCpuType:*/
@@ -108,7 +106,7 @@ func (cdi *CDIHandler) CreateClaimSpecFile(claimUID string, devices PreparedDevi
 		claimEdits := cdiapi.ContainerEdits{
 			ContainerEdits: &cdispec.ContainerEdits{
 				Env: []string{
-					fmt.Sprintf("GPU_DEVICE_%s_RESOURCE_CLAIM=%s", device.DeviceName[4:], claimUID),
+					fmt.Sprintf("CPU_DEVICE_%s_RESOURCE_CLAIM=%s", device.DeviceName[4:], claimUID),
 				},
 			},
 		}
