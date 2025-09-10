@@ -22,86 +22,83 @@ import (
 
 // These constants represent the different Sharing strategies.
 const (
-	TimeSlicingStrategy       GpuSharingStrategy = "TimeSlicing"
-	SpacePartitioningStrategy GpuSharingStrategy = "SpacePartitioning"
+	RealTimeStrategy CpuSharingStrategy = "RealTime"
+	CfsStrategy      CpuSharingStrategy = "Cfs"
 )
 
-// These constants represent the different TimeSlicing configurations.
+// These constants represent the different CPU sharing configurations.
 const (
-	DefaultTimeSlice TimeSliceInterval = "Default"
-	ShortTimeSlice   TimeSliceInterval = "Short"
-	MediumTimeSlice  TimeSliceInterval = "Medium"
-	LongTimeSlice    TimeSliceInterval = "Long"
+	DefaultRuntimeUs int64 = 950000  // 950ms
+	DefaultPeriodUs  int64 = 1000000 // 1000ms (1s)
+	DefaultShares    int64 = 1024
 )
 
-// GpuSharingStrategy defines the valid Sharing strategies as a string.
-type GpuSharingStrategy string
+// CpuSharingStrategy defines the valid Sharing strategies as a string.
+type CpuSharingStrategy string
 
-// TimeSliceInterval defines the valid timeslice interval as a string.
-type TimeSliceInterval string
-
-// GpuSharing holds the current sharing strategy for GPUs and its settings.
+// CpuSharing holds the current sharing strategy for CPUs and its settings.
 // If DeviceClass and ResourceClaim set this, then the strategy from the claim
 // is used. If multiple configurations set this, then the last one is used.
-type GpuSharing struct {
-	Strategy                GpuSharingStrategy       `json:"strategy"`
-	TimeSlicingConfig       *TimeSlicingConfig       `json:"timeSlicingConfig,omitempty"`
-	SpacePartitioningConfig *SpacePartitioningConfig `json:"spacePartitioningConfig,omitempty"`
+type CpuSharing struct {
+	Strategy        CpuSharingStrategy `json:"strategy"`
+	RealTimeConfig  *RealTimeConfig    `json:"realTimeConfig,omitempty"`
+	CfsConfig       *CfsConfig         `json:"cfsConfig,omitempty"`
 }
 
-// TimeSlicingSettings provides the settings for the TimeSlicing strategy.
-type TimeSlicingConfig struct {
-	Interval TimeSliceInterval `json:"interval,omitempty"`
+// RealTimeConfig provides the settings for the RealTime strategy.
+type RealTimeConfig struct {
+	// RuntimeUs specifies the CPU runtime in microseconds for real-time scheduling
+	RuntimeUs int64 `json:"runtimeUs,omitempty"`
+	// PeriodUs specifies the CPU period in microseconds for real-time scheduling
+	PeriodUs int64 `json:"periodUs,omitempty"`
 }
 
-// SpacePartitioningConfig provides the configuring for the SpacePartitioning strategy.
-type SpacePartitioningConfig struct {
-	// SliceCount indicates how many equally sized (memory and compute) slices
-	// the GPU should be divided into. Each client that attaches will get
-	// access to exactly one of these slices.
-	PartitionCount int `json:"partitionCount,omitempty"`
+// CfsConfig provides the settings for the CFS (Completely Fair Scheduler) strategy.
+type CfsConfig struct {
+	// Shares indicates the CPU shares for CFS scheduling
+	Shares int64 `json:"shares,omitempty"`
 }
 
-// IsTimeSlicing checks if the TimeSlicing strategy is applied.
-func (s *GpuSharing) IsTimeSlicing() bool {
+// IsRealTime checks if the RealTime strategy is applied.
+func (s *CpuSharing) IsRealTime() bool {
 	if s == nil {
 		return false
 	}
-	return s.Strategy == TimeSlicingStrategy
+	return s.Strategy == RealTimeStrategy
 }
 
-// IsSpacePartitioning checks if the SpacePartitioning strategy is applied.
-func (s *GpuSharing) IsSpacePartitioning() bool {
+// IsCfs checks if the CFS strategy is applied.
+func (s *CpuSharing) IsCfs() bool {
 	if s == nil {
 		return false
 	}
-	return s.Strategy == SpacePartitioningStrategy
+	return s.Strategy == CfsStrategy
 }
 
-// GetTimeSlicingConfig returns the timeslicing config that applies to the given strategy.
-func (s *GpuSharing) GetTimeSlicingConfig() (*TimeSlicingConfig, error) {
+// GetRealTimeConfig returns the real-time config that applies to the given strategy.
+func (s *CpuSharing) GetRealTimeConfig() (*RealTimeConfig, error) {
 	if s == nil {
 		return nil, fmt.Errorf("no sharing set to get config from")
 	}
-	if s.Strategy != TimeSlicingStrategy {
-		return nil, fmt.Errorf("strategy is not set to '%v'", TimeSlicingStrategy)
+	if s.Strategy != RealTimeStrategy {
+		return nil, fmt.Errorf("strategy is not set to '%v'", RealTimeStrategy)
 	}
-	if s.SpacePartitioningConfig != nil {
-		return nil, fmt.Errorf("cannot use SpacePartitioningConfig with the '%v' strategy", TimeSlicingStrategy)
+	if s.CfsConfig != nil {
+		return nil, fmt.Errorf("cannot use CfsConfig with the '%v' strategy", RealTimeStrategy)
 	}
-	return s.TimeSlicingConfig, nil
+	return s.RealTimeConfig, nil
 }
 
-// GetSpacePartitioningConfig returns the SpacePartitioning config that applies to the given strategy.
-func (s *GpuSharing) GetSpacePartitioningConfig() (*SpacePartitioningConfig, error) {
+// GetCfsConfig returns the CFS config that applies to the given strategy.
+func (s *CpuSharing) GetCfsConfig() (*CfsConfig, error) {
 	if s == nil {
 		return nil, fmt.Errorf("no sharing set to get config from")
 	}
-	if s.Strategy != SpacePartitioningStrategy {
-		return nil, fmt.Errorf("strategy is not set to '%v'", SpacePartitioningStrategy)
+	if s.Strategy != CfsStrategy {
+		return nil, fmt.Errorf("strategy is not set to '%v'", CfsStrategy)
 	}
-	if s.TimeSlicingConfig != nil {
-		return nil, fmt.Errorf("cannot use TimeSlicingConfig with the '%v' strategy", SpacePartitioningStrategy)
+	if s.RealTimeConfig != nil {
+		return nil, fmt.Errorf("cannot use RealTimeConfig with the '%v' strategy", CfsStrategy)
 	}
-	return s.SpacePartitioningConfig, nil
+	return s.CfsConfig, nil
 }

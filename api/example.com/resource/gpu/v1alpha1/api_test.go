@@ -23,76 +23,79 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGpuConfigNormalize(t *testing.T) {
+func TestCpuConfigNormalize(t *testing.T) {
 	tests := map[string]struct {
-		gpuConfig   *GpuConfig
-		expected    *GpuConfig
+		cpuConfig   *CpuConfig
+		expected    *CpuConfig
 		expectedErr error
 	}{
-		"nil GpuConfig": {
-			gpuConfig:   nil,
+		"nil CpuConfig": {
+			cpuConfig:   nil,
 			expectedErr: errors.New("config is 'nil'"),
 		},
-		"empty GpuConfig": {
-			gpuConfig: &GpuConfig{},
-			expected: &GpuConfig{
-				Sharing: &GpuSharing{
-					Strategy: TimeSlicingStrategy,
-					TimeSlicingConfig: &TimeSlicingConfig{
-						Interval: DefaultTimeSlice,
+		"empty CpuConfig": {
+			cpuConfig: &CpuConfig{},
+			expected: &CpuConfig{
+				Sharing: &CpuSharing{
+					Strategy: RealTimeStrategy,
+					RealTimeConfig: &RealTimeConfig{
+						RuntimeUs: DefaultRuntimeUs,
+						PeriodUs:  DefaultPeriodUs,
 					},
 				},
 			},
 		},
-		"empty GpuConfig with SpacePartitioning": {
-			gpuConfig: &GpuConfig{
-				Sharing: &GpuSharing{
-					Strategy: SpacePartitioningStrategy,
+		"empty CpuConfig with Cfs": {
+			cpuConfig: &CpuConfig{
+				Sharing: &CpuSharing{
+					Strategy: CfsStrategy,
 				},
 			},
-			expected: &GpuConfig{
-				Sharing: &GpuSharing{
-					Strategy: SpacePartitioningStrategy,
-					SpacePartitioningConfig: &SpacePartitioningConfig{
-						PartitionCount: 1,
-					},
-				},
-			},
-		},
-		"full GpuConfig": {
-			gpuConfig: &GpuConfig{
-				Sharing: &GpuSharing{
-					Strategy: SpacePartitioningStrategy,
-					TimeSlicingConfig: &TimeSlicingConfig{
-						Interval: ShortTimeSlice,
-					},
-					SpacePartitioningConfig: &SpacePartitioningConfig{
-						PartitionCount: 5,
-					},
-				},
-			},
-			expected: &GpuConfig{
-				Sharing: &GpuSharing{
-					Strategy: SpacePartitioningStrategy,
-					TimeSlicingConfig: &TimeSlicingConfig{
-						Interval: ShortTimeSlice,
-					},
-					SpacePartitioningConfig: &SpacePartitioningConfig{
-						PartitionCount: 5,
+			expected: &CpuConfig{
+				Sharing: &CpuSharing{
+					Strategy: CfsStrategy,
+					CfsConfig: &CfsConfig{
+						Shares: DefaultShares,
 					},
 				},
 			},
 		},
-		"default GpuConfig is already normalized": {
-			gpuConfig: DefaultGpuConfig(),
-			expected:  DefaultGpuConfig(),
+		"full CpuConfig": {
+			cpuConfig: &CpuConfig{
+				Sharing: &CpuSharing{
+					Strategy: RealTimeStrategy,
+					RealTimeConfig: &RealTimeConfig{
+						RuntimeUs: 500000,  // 500ms
+						PeriodUs:  1000000, // 1000ms
+					},
+					CfsConfig: &CfsConfig{
+						Shares: 2048,
+					},
+				},
+			},
+			expected: &CpuConfig{
+				Sharing: &CpuSharing{
+					Strategy: RealTimeStrategy,
+					RealTimeConfig: &RealTimeConfig{
+						RuntimeUs: 500000,  // 500ms
+						PeriodUs:  1000000, // 1000ms
+					},
+					CfsConfig: &CfsConfig{
+						Shares: 2048,
+					},
+				},
+			},
+		},
+		"default CpuConfig is already normalized": {
+			cpuConfig: DefaultCpuConfig(),
+			expected:  DefaultCpuConfig(),
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := test.gpuConfig.Normalize()
-			assert.Equal(t, test.expected, test.gpuConfig)
+			err := test.cpuConfig.Normalize()
+			assert.Equal(t, test.expected, test.cpuConfig)
 			assert.Equal(t, test.expectedErr, err)
 		})
 	}

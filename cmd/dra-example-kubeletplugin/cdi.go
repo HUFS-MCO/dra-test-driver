@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"sigs.k8s.io/dra-example-driver/pkg/consts"
 
@@ -41,6 +42,8 @@ const (
 
 	cdiCommonDeviceName = "common"
 )
+
+const hookBinaryPath = "/usr/local/bin/cpu-cgroup-hook"
 
 
 type CDIHandler struct {
@@ -112,9 +115,26 @@ func (cdi *CDIHandler) CreateClaimSpecFile(claimUID string, devices PreparedDevi
 		}
 		claimEdits.Append(device.ContainerEdits)
 
+		// Derive generic envs for the hook from per-device envs
+		genericEnvs := deriveGenericCPUEnvs(device.DeviceName[4:], claimEdits.ContainerEdits.Env)
+		allHookEnv := append([]string{}, claimEdits.ContainerEdits.Env...)
+		allHookEnv = append(allHookEnv, genericEnvs...)
+
+		// Add a prestart hook which runs on the host to set cgroup parameters based on env
+		prestartHook := cdispec.Hook{
+			Path: hookBinaryPath,
+			Args: []string{"cpu-cgroup-hook"},
+			Env:  allHookEnv,
+		}
+
 		cdiDevice := cdispec.Device{
-			Name:           fmt.Sprintf("%s-%s", claimUID, device.DeviceName),
-			ContainerEdits: *claimEdits.ContainerEdits,
+			Name: fmt.Sprintf("%s-%s", claimUID, device.DeviceName),
+			ContainerEdits: cdispec.ContainerEdits{
+				Env: allHookEnv,
+				Hooks: &cdispec.Hooks{
+					Prestart: []cdispec.Hook{prestartHook},
+				},
+			},
 		}
 
 		spec.Devices = append(spec.Devices, cdiDevice)
@@ -145,4 +165,33 @@ func (cdi *CDIHandler) GetClaimDevices(claimUID string, devices []string) []stri
 	}
 
 	return cdiDevices
+}
+
+// deriveGenericCPUEnvs takes per-device envs and produces generic env names for the hook to read
+// e.g. CPU_DEVICE_0_RT_RUNTIME_US -> CPU_RT_RUNTIME_US
+func deriveGenericCPUEnvs(deviceIndex string, envs []string) []string {
+	prefix := fmt.Sprintf("CPU_DEVICE_%s_", deviceIndex)
+	var out []string
+	for _, e := range envs {
+		if !strings.HasPrefix(e, prefix) {
+			continue
+		}
+		kv := strings.SplitN(e, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		key := kv[0]
+		val := kv[1]
+		trimmed := strings.TrimPrefix(key, prefix)
+		// Only map the keys we expect the hook to consume
+		switch trimmed {
+		case "RT_RUNTIME_US":
+			out = append(out, "CPU_RT_RUNTIME_US="+val)
+		case "RT_PERIOD_US":
+			out = append(out, "CPU_RT_PERIOD_US="+val)
+		case "CFS_SHARES":
+			out = append(out, "CPU_CFS_SHARES="+val)
+		}
+	}
+	return out
 }

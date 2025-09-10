@@ -37,6 +37,16 @@ spec:
       securityContext:
         {{- toYaml .Values.kubeletPlugin.podSecurityContext | nindent 8 }}
       containers:
+      - name: init-hook
+        image: {{ include "dra-example-driver.fullimage" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["/bin/sh","-c"]
+        args: ["cp -f /usr/bin/cpu-cgroup-hook /host/usr/local/bin/cpu-cgroup-hook && chmod +x /host/usr/local/bin/cpu-cgroup-hook"]
+        resources:
+          {{- toYaml .Values.kubeletPlugin.containers.init.resources | nindent 10 }}
+        volumeMounts:
+        - name: host-usrlocalbin
+          mountPath: /host/usr/local/bin
       - name: plugin
         securityContext:
           {{- toYaml .Values.kubeletPlugin.containers.plugin.securityContext | nindent 10 }}
@@ -88,6 +98,9 @@ spec:
         - name: cdi
           mountPath: /var/run/cdi
       volumes:
+      - name: host-usrlocalbin
+        hostPath:
+          path: /usr/local/bin
       - name: plugins-registry
         hostPath:
           path: {{ .Values.kubeletPlugin.kubeletRegistrarDirectoryPath | quote }}

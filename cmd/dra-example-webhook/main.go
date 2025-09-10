@@ -272,12 +272,12 @@ func admitResourceClaimParameters(ar admissionv1.AdmissionReview) *admissionv1.A
 			errs = append(errs, fmt.Errorf("error decoding object at %s: %w", fieldPath, err))
 			continue
 		}
-		gpuConfig, ok := decodedConfig.(*configapi.GpuConfig)
+		cpuConfig, ok := decodedConfig.(*configapi.CpuConfig)
 		if !ok {
-			errs = append(errs, fmt.Errorf("expected v1alpha1.GpuConfig at %s but got: %T", fieldPath, decodedConfig))
+			errs = append(errs, fmt.Errorf("expected v1alpha1.CpuConfig at %s but got: %T", fieldPath, decodedConfig))
 			continue
 		}
-		err = gpuConfig.Validate()
+		err = cpuConfig.Validate()
 		if err != nil {
 			errs = append(errs, fmt.Errorf("object at %s is invalid: %w", fieldPath, err))
 		}

@@ -20,53 +20,53 @@ import (
 	"fmt"
 )
 
-// Validate ensures that GpuSharingStrategy has a valid set of values.
-func (s GpuSharingStrategy) Validate() error {
+// Validate ensures that CpuSharingStrategy has a valid set of values.
+func (s CpuSharingStrategy) Validate() error {
 	switch s {
-	case TimeSlicingStrategy, SpacePartitioningStrategy:
+	case RealTimeStrategy, CfsStrategy:
 		return nil
 	}
-	return fmt.Errorf("unknown GPU sharing strategy: %v", s)
+	return fmt.Errorf("unknown CPU sharing strategy: %v", s)
 }
 
-// Validate ensures that TimeSliceInterval has a valid set of values.
-func (d TimeSliceInterval) Validate() error {
-	switch d {
-	case DefaultTimeSlice, ShortTimeSlice, MediumTimeSlice, LongTimeSlice:
-		return nil
+// Validate ensures that RealTimeConfig has a valid set of values.
+func (c *RealTimeConfig) Validate() error {
+	if c.RuntimeUs <= 0 {
+		return fmt.Errorf("invalid runtime: %v, must be positive", c.RuntimeUs)
 	}
-	return fmt.Errorf("unknown time-slice interval: %v", d)
-}
-
-// Validate ensures that TimeSlicingConfig has a valid set of values.
-func (c *TimeSlicingConfig) Validate() error {
-	return c.Interval.Validate()
-}
-
-// Validate ensures that SpacePartitioningConfig has a valid set of values.
-func (c *SpacePartitioningConfig) Validate() error {
-	if c.PartitionCount < 0 {
-		return fmt.Errorf("invalid partition count: %v", c.PartitionCount)
+	if c.PeriodUs <= 0 {
+		return fmt.Errorf("invalid period: %v, must be positive", c.PeriodUs)
+	}
+	if c.RuntimeUs > c.PeriodUs {
+		return fmt.Errorf("runtime (%v) cannot be greater than period (%v)", c.RuntimeUs, c.PeriodUs)
 	}
 	return nil
 }
 
-// Validate ensures that GpuSharing has a valid set of values.
-func (s *GpuSharing) Validate() error {
+// Validate ensures that CfsConfig has a valid set of values.
+func (c *CfsConfig) Validate() error {
+	if c.Shares <= 0 {
+		return fmt.Errorf("invalid shares: %v, must be positive", c.Shares)
+	}
+	return nil
+}
+
+// Validate ensures that CpuSharing has a valid set of values.
+func (s *CpuSharing) Validate() error {
 	if err := s.Strategy.Validate(); err != nil {
 		return err
 	}
 	switch {
-	case s.IsTimeSlicing():
-		return s.TimeSlicingConfig.Validate()
-	case s.IsSpacePartitioning():
-		return s.SpacePartitioningConfig.Validate()
+	case s.IsRealTime():
+		return s.RealTimeConfig.Validate()
+	case s.IsCfs():
+		return s.CfsConfig.Validate()
 	}
-	return fmt.Errorf("invalid GPU sharing settings: %v", s)
+	return fmt.Errorf("invalid CPU sharing settings: %v", s)
 }
 
-// Validate ensures that GpuConfig has a valid set of values.
-func (c *GpuConfig) Validate() error {
+// Validate ensures that CpuConfig has a valid set of values.
+func (c *CpuConfig) Validate() error {
 	if c.Sharing == nil {
 		return fmt.Errorf("no sharing strategy set")
 	}

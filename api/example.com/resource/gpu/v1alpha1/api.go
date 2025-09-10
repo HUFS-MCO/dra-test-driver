@@ -26,10 +26,10 @@ import (
 )
 
 const (
-	GroupName = "gpu.resource.example.com"
+	GroupName = "cpu.resource.example.com"
 	Version   = "v1alpha1"
 
-	GpuConfigKind = "GpuConfig"
+	CpuConfigKind = "CpuConfig"
 )
 
 // Decoder implements a decoder for objects in this API group.
@@ -38,46 +38,48 @@ var Decoder runtime.Decoder
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// GpuConfig holds the set of parameters for configuring a GPU.
-type GpuConfig struct {
+// CpuConfig holds the set of parameters for configuring a CPU.
+type CpuConfig struct {
 	metav1.TypeMeta `json:",inline"`
-	Sharing         *GpuSharing `json:"sharing,omitempty"`
+	Sharing         *CpuSharing `json:"sharing,omitempty"`
 }
 
-// DefaultGpuConfig provides the default GPU configuration.
-func DefaultGpuConfig() *GpuConfig {
-	return &GpuConfig{
+// DefaultCpuConfig provides the default CPU configuration.
+func DefaultCpuConfig() *CpuConfig {
+	return &CpuConfig{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: GroupName + "/" + Version,
-			Kind:       GpuConfigKind,
+			Kind:       CpuConfigKind,
 		},
-		Sharing: &GpuSharing{
-			Strategy: TimeSlicingStrategy,
-			TimeSlicingConfig: &TimeSlicingConfig{
-				Interval: "Default",
+		Sharing: &CpuSharing{
+			Strategy: RealTimeStrategy,
+			RealTimeConfig: &RealTimeConfig{
+				RuntimeUs: 950000,  // 950ms
+				PeriodUs:  1000000, // 1000ms (1s)
 			},
 		},
 	}
 }
 
-// Normalize updates a GpuConfig config with implied default values based on other settings.
-func (c *GpuConfig) Normalize() error {
+// Normalize updates a CpuConfig config with implied default values based on other settings.
+func (c *CpuConfig) Normalize() error {
 	if c == nil {
 		return fmt.Errorf("config is 'nil'")
 	}
 	if c.Sharing == nil {
-		c.Sharing = &GpuSharing{
-			Strategy: TimeSlicingStrategy,
+		c.Sharing = &CpuSharing{
+			Strategy: RealTimeStrategy,
 		}
 	}
-	if c.Sharing.Strategy == TimeSlicingStrategy && c.Sharing.TimeSlicingConfig == nil {
-		c.Sharing.TimeSlicingConfig = &TimeSlicingConfig{
-			Interval: "Default",
+	if c.Sharing.Strategy == RealTimeStrategy && c.Sharing.RealTimeConfig == nil {
+		c.Sharing.RealTimeConfig = &RealTimeConfig{
+			RuntimeUs: 950000,  // 950ms
+			PeriodUs:  1000000, // 1000ms (1s)
 		}
 	}
-	if c.Sharing.Strategy == SpacePartitioningStrategy && c.Sharing.SpacePartitioningConfig == nil {
-		c.Sharing.SpacePartitioningConfig = &SpacePartitioningConfig{
-			PartitionCount: 1,
+	if c.Sharing.Strategy == CfsStrategy && c.Sharing.CfsConfig == nil {
+		c.Sharing.CfsConfig = &CfsConfig{
+			Shares: 1024,
 		}
 	}
 	return nil
@@ -94,7 +96,7 @@ func init() {
 		Version: Version,
 	}
 	scheme.AddKnownTypes(schemeGroupVersion,
-		&GpuConfig{},
+		&CpuConfig{},
 	)
 	metav1.AddToGroupVersion(scheme, schemeGroupVersion)
 

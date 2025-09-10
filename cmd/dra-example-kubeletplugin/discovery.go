@@ -18,41 +18,41 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
+	"runtime"
+	"strconv"
+	"strings"
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
-
-	"github.com/google/uuid"
 )
 
-func enumerateAllPossibleDevices(numGPUs int) (AllocatableDevices, error) {
-	seed := os.Getenv("NODE_NAME")
-	uuids := generateUUIDs(seed, numGPUs)
+func enumerateAllPossibleDevices(_ int) (AllocatableDevices, error) {
+	cpuIDs, err := discoverOnlineCPUIds()
+	if err != nil {
+		return nil, err
+	}
 
 	alldevices := make(AllocatableDevices)
-	for i, uuid := range uuids {
+	for _, id := range cpuIDs {
+		name := fmt.Sprintf("cpu-%d", id)
 		device := resourceapi.Device{
-			Name: fmt.Sprintf("gpu-%d", i),
+			Name: name,
 			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 				"index": {
-					IntValue: ptr.To(int64(i)),
+					IntValue: ptr.To(int64(id)),
 				},
-				"uuid": {
-					StringValue: ptr.To(uuid),
-				},
-				"model": {
-					StringValue: ptr.To("LATEST-GPU-MODEL"),
+				"policy": {
+					StringValue: ptr.To("RT|CFS"),
 				},
 				"driverVersion": {
 					VersionValue: ptr.To("1.0.0"),
 				},
 			},
 			Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
-				"memory": {
-					Value: resource.MustParse("80Gi"),
+				"cores": {
+					Value: resource.MustParse("1"),
 				},
 			},
 		}
@@ -61,24 +61,55 @@ func enumerateAllPossibleDevices(numGPUs int) (AllocatableDevices, error) {
 	return alldevices, nil
 }
 
-func generateUUIDs(seed string, count int) []string {
-	rand := rand.New(rand.NewSource(hash(seed)))
-
-	uuids := make([]string, count)
-	for i := 0; i < count; i++ {
-		charset := make([]byte, 16)
-		rand.Read(charset)
-		uuid, _ := uuid.FromBytes(charset)
-		uuids[i] = "gpu-" + uuid.String()
+// discoverOnlineCPUIds returns the set of online CPU IDs on the node.
+// It prefers parsing /sys/devices/system/cpu/online. If unavailable, it falls back to runtime.NumCPU.
+func discoverOnlineCPUIds() ([]int, error) {
+	const onlinePath = "/sys/devices/system/cpu/online"
+	data, err := os.ReadFile(onlinePath)
+	if err == nil {
+		ids, perr := parseCPUList(strings.TrimSpace(string(data)))
+		if perr == nil && len(ids) > 0 {
+			return ids, nil
+		}
 	}
-
-	return uuids
+	// Fallback: use runtime.NumCPU.
+	n := runtime.NumCPU()
+	ids := make([]int, 0, n)
+	for i := 0; i < n; i++ {
+		ids = append(ids, i)
+	}
+	return ids, nil
 }
 
-func hash(s string) int64 {
-	h := int64(0)
-	for _, c := range s {
-		h = 31*h + int64(c)
+// parseCPUList parses a Linux CPU list string like "0-3,5,7-8" into a sorted list of IDs.
+func parseCPUList(s string) ([]int, error) {
+	if s == "" {
+		return nil, fmt.Errorf("empty cpu list")
 	}
-	return h
+	var ids []int
+	parts := strings.Split(s, ",")
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if strings.Contains(p, "-") {
+			rangeParts := strings.SplitN(p, "-", 2)
+			start, err1 := strconv.Atoi(rangeParts[0])
+			end, err2 := strconv.Atoi(rangeParts[1])
+			if err1 != nil || err2 != nil || start > end {
+				return nil, fmt.Errorf("invalid cpu range: %q", p)
+			}
+			for i := start; i <= end; i++ {
+				ids = append(ids, i)
+			}
+			continue
+		}
+		v, err := strconv.Atoi(p)
+		if err != nil {
+			return nil, fmt.Errorf("invalid cpu id: %q", p)
+		}
+		ids = append(ids, v)
+	}
+	return ids, nil
 }
